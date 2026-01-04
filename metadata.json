@@ -1,0 +1,9 @@
+
+{
+  "name": "Mind Corps Analytics",
+  "description": "A high-performance intelligence dashboard by Mind Corps, integrating Firebase Firestore and Gemini AI for advanced data synthesis and strategic insights.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
