@@ -7,7 +7,6 @@ import {
   ProbabilityAssessment,
   DiagnosticReport,
   Psychologist,
-  FactorAnalysis,
   SeverityLevel,
   ProbabilityLevel,
   RiskMatrixLevel
@@ -37,39 +36,62 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
   const [analysisData, setAnalysisData] = useState(
     buildSectorAnalysisData(company, sectorId, responses, probability, report)
   );
+
+  // data de geração (usada logo abaixo do título)
+  const [generationDate] = useState<string>(
+    report?.dataElaboracao || new Date().toLocaleDateString('pt-BR')
+  );
+
   const [localReport, setLocalReport] = useState<Partial<DiagnosticReport>>({
     fontesGeradoras: report?.fontesGeradoras || {},
-    agravos: report?.agravos || {},
-    medidas: report?.medidas || {},
+    agravosSaude: report?.agravosSaude || '',
+    medidasControle: report?.medidasControle || '',
+    conclusao: report?.conclusao || '',
     funcoes: report?.funcoes || analysisData.funcoes,
     dataElaboracao: report?.dataElaboracao || analysisData.dataElaboracao,
-    author: report?.author || psychologist?.nome || ''
+    author:
+      report?.author ||
+      psychologist?.nomeCompleto ||
+      (psychologist as any)?.nome ||
+      ''
   });
 
   useEffect(() => {
-    // Recalcula a análise se os dados de entrada mudarem
-    const newAnalysisData = buildSectorAnalysisData(company, sectorId, responses, probability, report);
+    const newAnalysisData = buildSectorAnalysisData(
+      company,
+      sectorId,
+      responses,
+      probability,
+      report
+    );
     setAnalysisData(newAnalysisData);
 
-    // Atualiza o localReport com os dados mais recentes do report ou defaults
-    setLocalReport({
+    setLocalReport(prev => ({
+      ...prev,
       fontesGeradoras: report?.fontesGeradoras || {},
-      agravos: report?.agravos || {},
-      medidas: report?.medidas || {},
+      agravosSaude: report?.agravosSaude || prev.agravosSaude || '',
+      medidasControle: report?.medidasControle || prev.medidasControle || '',
+      conclusao: report?.conclusao || prev.conclusao || '',
       funcoes: report?.funcoes || newAnalysisData.funcoes,
       dataElaboracao: report?.dataElaboracao || newAnalysisData.dataElaboracao,
-      author: report?.author || psychologist?.nome || ''
-    });
+      author:
+        report?.author ||
+        psychologist?.nomeCompleto ||
+        (psychologist as any)?.nome ||
+        ''
+    }));
   }, [company, sectorId, responses, probability, report, psychologist]);
 
-  const getSeverityColor = (level: SeverityLevel | ProbabilityLevel | RiskMatrixLevel) => {
+  const getSeverityColor = (
+    level: SeverityLevel | ProbabilityLevel | RiskMatrixLevel
+  ) => {
     switch (level) {
       case 'Baixa':
       case 'Baixo':
         return 'bg-green-600 text-white';
       case 'Média':
       case 'Médio':
-        return 'bg-yellow-500 text-gray-900';
+        return 'bg-yellow-400 text-gray-900';
       case 'Alta':
       case 'Alto':
         return 'bg-red-600 text-white';
@@ -81,17 +103,23 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
     }
   };
 
-  const handleFieldChange = (
-    factorId: number,
-    field: 'fontesGeradoras' | 'agravos' | 'medidas',
-    value: string
-  ) => {
-    setLocalReport((prev) => ({
+  const handleFonteChange = (factorId: number, value: string) => {
+    setLocalReport(prev => ({
       ...prev,
-      [field]: {
-        ...prev[field],
+      fontesGeradoras: {
+        ...(prev.fontesGeradoras || {}),
         [factorId]: value
       }
+    }));
+  };
+
+  const handleSimpleFieldChange = (
+    field: 'agravosSaude' | 'medidasControle' | 'conclusao',
+    value: string
+  ) => {
+    setLocalReport(prev => ({
+      ...prev,
+      [field]: value
     }));
   };
 
@@ -99,93 +127,181 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
     onSave(localReport);
   };
 
-  // Função para exportar para PDF (placeholder)
   const handleExportPdf = () => {
     alert('Funcionalidade de exportar para PDF ainda não implementada.');
-    // Aqui você integraria uma biblioteca como jsPDF ou html2pdf
+  };
+
+  // monta texto "Nome – CRP: 06/74013"
+  const renderResponsavel = () => {
+    const nome =
+      localReport.author ||
+      psychologist?.nomeCompleto ||
+      (psychologist as any)?.nome ||
+      'Não informado';
+    const crp = psychologist?.crp || (psychologist as any)?.registroCRP;
+
+    if (crp) {
+      return `${nome} – CRP: ${crp}`;
+    }
+    return nome;
   };
 
   return (
-    <div className="p-8 bg-white text-gray-800 font-sans">
-      <div className="mb-8 border-b pb-6 border-gray-300">
-        <h1 className="text-3xl font-bold text-blue-900 mb-4">Análise de Resultados - NR-01</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+    <div className="p-8 bg-white text-gray-900 font-sans max-w-[210mm] mx-auto">
+      {/* ===== TOPO: TÍTULO + DATA + RESPONSÁVEL + DADOS DA EMPRESA ===== */}
+      <div className="mb-6 border-b border-gray-300 pb-4">
+        {/* Linha 1: Título */}
+        <h1 className="text-2xl font-bold text-left text-gray-900">
+          Analise e Resultado
+        </h1>
+
+        {/* Linha 2: Data de geração do documento */}
+        <p className="mt-1 text-sm text-left text-gray-700">
+          <span className="font-semibold">Data de geração: </span>
+          {generationDate}
+        </p>
+
+        {/* Linha 3: Responsável Técnico + CRP (nome + CRP do Firebase) */}
+        <p className="mt-2 text-sm text-left">
+          <span className="font-semibold">Responsável Técnico: </span>
+          {renderResponsavel()}
+        </p>
+
+        {/* Dados da Empresa — cada linha separada, alinhada à esquerda */}
+        <div className="mt-4 space-y-1 text-sm text-left">
           <p>
-            <strong className="text-blue-800">Empresa:</strong> {analysisData.company.nomeFantasia}
+            <span className="font-semibold">RAZÃO SOCIAL: </span>
+            {company.razaoSocial || 'N/A'}
           </p>
           <p>
-            <strong className="text-blue-800">CNPJ:</strong> {analysisData.company.cnpj}
+            <span className="font-semibold">NOME FANTASIA: </span>
+            {company.nomeFantasia || 'N/A'}
           </p>
           <p>
-            <strong className="text-blue-800">Setor:</strong> {analysisData.sectorName}
+            <span className="font-semibold">CNPJ: </span>
+            {company.cnpj || 'N/A'}
           </p>
           <p>
-            <strong className="text-blue-800">Data da Elaboração:</strong>{' '}
-            {localReport.dataElaboracao}
+            <span className="font-semibold">SETOR: </span>
+            {analysisData.sectorName || 'N/A'}
           </p>
-          <p className="col-span-2">
-            <strong className="text-blue-800">Funções Avaliadas:</strong>{' '}
+          <p>
+            <span className="font-semibold">FUNÇÕES: </span>
             {localReport.funcoes?.join(', ') || 'N/A'}
-          </p>
-          <p className="col-span-2">
-            <strong className="text-blue-800">Responsável Técnico:</strong>{' '}
-            {localReport.author || 'Não informado'}
-            {psychologist?.registroCRP && ` (CRP: ${psychologist.registroCRP})`}
           </p>
         </div>
       </div>
 
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-blue-800 mb-4">
-          Classificação de Risco Psicossocial
+      {/* ===== CAIXA 1: POSSÍVEIS AGRAVOS ===== */}
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold mb-1 text-left">
+          Possíveis Agravos a saúde Mental
         </h2>
-        <table className="min-w-full bg-white border border-gray-300 shadow-md rounded-lg overflow-hidden">
-          <thead className="bg-blue-700 text-white">
-            <tr>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Fatores de Risco</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Fonte Geradora do Risco</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Gravidade (Severidade)</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Probabilidade de Ocorrência</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Matriz Risco</th>
+        <textarea
+          value={localReport.agravosSaude || ''}
+          onChange={e => handleSimpleFieldChange('agravosSaude', e.target.value)}
+          className="w-full border border-gray-300 rounded-md p-2 text-sm resize-vertical min-h-[80px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Digite aqui os possíveis agravos à saúde mental identificados..."
+        />
+      </div>
+
+      {/* ===== CAIXA 2: MEDIDAS DE CONTROLE ===== */}
+      <div className="mb-6">
+        <h2 className="text-sm font-semibold mb-1 text-left">
+          Medidas de Controle Existentes:
+        </h2>
+        <textarea
+          value={localReport.medidasControle || ''}
+          onChange={e =>
+            handleSimpleFieldChange('medidasControle', e.target.value)
+          }
+          className="w-full border border-gray-300 rounded-md p-2 text-sm resize-vertical min-h-[80px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Digite aqui as medidas de controle existentes..."
+        />
+      </div>
+
+      {/* ===== TABELA: CRITÉRIO + QUANTITATIVO E QUALITATIVO ===== */}
+      <div className="mb-6">
+        {/* Linha acima da tabela:
+            - "Critério" em um quadrinho azul alinhado à coluna 1
+            - "Quantitativo e Qualitativo" em um quadrinho azul alinhado às colunas 2–5
+        */}
+        <div className="grid grid-cols-5 text-xs font-semibold mb-0">
+          {/* Coluna 1: Critério dentro de um quadrinho azul */}
+          <div className="col-span-1 text-center border border-blue-700 bg-blue-700 text-white py-1 rounded-t-md">
+            Critério
+          </div>
+          {/* Colunas 2–5: Quantitativo e Qualitativo dentro de outro quadrinho azul */}
+          <div className="col-span-4 text-center border border-blue-700 bg-blue-700 text-white py-1 rounded-t-md ml-[-1px]">
+            Quantitativo e Qualitativo
+          </div>
+        </div>
+
+        {/* Tabela */}
+        <table className="w-full text-xs border-collapse border border-gray-400">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="border border-gray-400 px-2 py-1 text-left font-semibold w-[24%]">
+                Fatores de Risco
+              </th>
+              <th className="border border-gray-400 px-2 py-1 text-left font-semibold w-[26%]">
+                Fonte Geradora do Risco
+              </th>
+              <th className="border border-gray-400 px-2 py-1 text-center font-semibold w-[16%]">
+                Gravidade (Severidade)
+              </th>
+              <th className="border border-gray-400 px-2 py-1 text-center font-semibold w-[18%]">
+                Probabilidade de Ocorrência
+              </th>
+              <th className="border border-gray-400 px-2 py-1 text-center font-semibold w-[16%]">
+                Matriz Risco
+              </th>
             </tr>
           </thead>
           <tbody>
-            {analysisData.factors.map((item) => (
-              <tr key={item.factor.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="py-3 px-4 text-sm font-medium text-gray-900">
+            {analysisData.factors.map(item => (
+              <tr key={item.factor.id} className="align-top hover:bg-gray-50">
+                {/* Coluna 1: Fatores de Risco (texto fixo) */}
+                <td className="border border-gray-400 px-2 py-1 font-medium text-left">
                   {item.factor.label}
                 </td>
-                <td className="py-3 px-4 text-sm">
+
+                {/* Coluna 2: Fonte Geradora (editável, por fator) */}
+                <td className="border border-gray-400 px-1 py-1">
                   <textarea
                     value={localReport.fontesGeradoras?.[item.factor.id] || ''}
-                    onChange={(e) =>
-                      handleFieldChange(item.factor.id, 'fontesGeradoras', e.target.value)
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800 resize-y min-h-[60px]"
-                    rows={3}
+                    onChange={e => handleFonteChange(item.factor.id, e.target.value)}
+                    className="w-full border border-gray-300 rounded-sm p-1 text-[11px] resize-vertical min-h-[50px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Descreva a fonte..."
                   />
                 </td>
-                <td className="py-3 px-4 text-sm">
+
+                {/* Coluna 3: Gravidade */}
+                <td className="border border-gray-400 px-1 py-1 text-center">
                   <span
-                    className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold text-xs ${getSeverityColor(
+                    className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${getSeverityColor(
                       item.gravidade
                     )}`}
                   >
                     {item.gravidade}
                   </span>
                 </td>
-                <td className="py-3 px-4 text-sm">
+
+                {/* Coluna 4: Probabilidade */}
+                <td className="border border-gray-400 px-1 py-1 text-center">
                   <span
-                    className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold text-xs ${getSeverityColor(
+                    className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${getSeverityColor(
                       item.probabilidade
                     )}`}
                   >
                     {item.probabilidade}
                   </span>
                 </td>
-                <td className="py-3 px-4 text-sm">
+
+                {/* Coluna 5: Matriz de Risco */}
+                <td className="border border-gray-400 px-1 py-1 text-center">
                   <span
-                    className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold text-xs ${getSeverityColor(
+                    className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${getSeverityColor(
                       item.matriz
                     )}`}
                   >
@@ -198,55 +314,31 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
         </table>
       </div>
 
-      {/* Seções de Agravos e Medidas (editáveis) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        <div>
-          <h2 className="text-2xl font-semibold text-blue-800 mb-4">Possíveis Agravos à Saúde Mental</h2>
-          {analysisData.factors.map((item) => (
-            <div key={`agravos-${item.factor.id}`} className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {item.factor.label}:
-              </label>
-              <textarea
-                value={localReport.agravos?.[item.factor.id] || ''}
-                onChange={(e) => handleFieldChange(item.factor.id, 'agravos', e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800 resize-y min-h-[80px]"
-                rows={4}
-              />
-            </div>
-          ))}
-        </div>
-        <div>
-          <h2 className="text-2xl font-semibold text-blue-800 mb-4">Medidas de Controle Existentes</h2>
-          {analysisData.factors.map((item) => (
-            <div key={`medidas-${item.factor.id}`} className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {item.factor.label}:
-              </label>
-              <textarea
-                value={localReport.medidas?.[item.factor.id] || ''}
-                onChange={(e) => handleFieldChange(item.factor.id, 'medidas', e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800 resize-y min-h-[80px]"
-                rows={4}
-              />
-            </div>
-          ))}
-        </div>
+      {/* ===== CAIXA 3: CONCLUSÃO ===== */}
+      <div className="mb-8">
+        <h2 className="text-sm font-semibold mb-1 text-left">CONCLUSÃO</h2>
+        <textarea
+          value={localReport.conclusao || ''}
+          onChange={e => handleSimpleFieldChange('conclusao', e.target.value)}
+          className="w-full border border-gray-300 rounded-md p-2 text-sm resize-vertical min-h-[80px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Digite aqui a conclusão da análise..."
+        />
       </div>
 
-      <div className="flex justify-end space-x-4 mt-8">
+      {/* ===== BOTÕES ===== */}
+      <div className="flex justify-end space-x-4 mt-4">
         <button
           onClick={handleExportPdf}
-          className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors"
+          className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm text-sm transition-colors"
         >
-          <FileDown className="w-5 h-5" />
+          <FileDown className="w-4 h-4" />
           <span>Exportar para PDF</span>
         </button>
         <button
           onClick={handleSaveClick}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors"
+          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm text-sm transition-colors"
         >
-          <Save className="w-5 h-5" />
+          <Save className="w-4 h-4" />
           <span>Salvar Análise</span>
         </button>
       </div>
