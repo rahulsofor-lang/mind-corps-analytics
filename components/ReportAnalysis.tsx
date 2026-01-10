@@ -1,5 +1,3 @@
-// components/ReportAnalysis.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
   Company,
@@ -7,7 +5,6 @@ import {
   ProbabilityAssessment,
   DiagnosticReport,
   Psychologist,
-  FactorAnalysis,
   SeverityLevel,
   ProbabilityLevel,
   RiskMatrixLevel
@@ -15,13 +12,30 @@ import {
 import { buildSectorAnalysisData } from '../services/analysisCalculator';
 import { FileDown, Save } from 'lucide-react';
 
+import { saveAs } from 'file-saver';
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  AlignmentType,
+  VerticalAlign,
+  ShadingType,
+  BorderStyle,
+  convertInchesToTwip,
+} from 'docx';
+
 interface ReportAnalysisProps {
   company: Company;
   sectorId: string;
   responses: SurveyResponse[];
   probability: ProbabilityAssessment | null;
   report: DiagnosticReport | null;
-  psychologist: Psychologist | null; // Pode ser null se não houver psicólogo logado
+  psychologist: Psychologist | null;
   onSave: (updatedReport: Partial<DiagnosticReport>) => void;
 }
 
@@ -37,218 +51,542 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
   const [analysisData, setAnalysisData] = useState(
     buildSectorAnalysisData(company, sectorId, responses, probability, report)
   );
+
+  const [generationDate] = useState<string>(
+    report?.dataElaboracao || new Date().toLocaleDateString('pt-BR')
+  );
+
   const [localReport, setLocalReport] = useState<Partial<DiagnosticReport>>({
     fontesGeradoras: report?.fontesGeradoras || {},
-    agravos: report?.agravos || {},
-    medidas: report?.medidas || {},
-    funcoes: report?.funcoes || analysisData.funcoes,
-    dataElaboracao: report?.dataElaboracao || analysisData.dataElaboracao,
-    author: report?.author || psychologist?.nome || ''
+    agravosSaude: report?.agravosSaude || '',
+    medidasControle: report?.medidasControle || '',
+    conclusao: report?.conclusao || '',
   });
 
   useEffect(() => {
-    // Recalcula a análise se os dados de entrada mudarem
-    const newAnalysisData = buildSectorAnalysisData(company, sectorId, responses, probability, report);
-    setAnalysisData(newAnalysisData);
-
-    // Atualiza o localReport com os dados mais recentes do report ou defaults
+    setAnalysisData(buildSectorAnalysisData(company, sectorId, responses, probability, report));
     setLocalReport({
       fontesGeradoras: report?.fontesGeradoras || {},
-      agravos: report?.agravos || {},
-      medidas: report?.medidas || {},
-      funcoes: report?.funcoes || newAnalysisData.funcoes,
-      dataElaboracao: report?.dataElaboracao || newAnalysisData.dataElaboracao,
-      author: report?.author || psychologist?.nome || ''
+      agravosSaude: report?.agravosSaude || '',
+      medidasControle: report?.medidasControle || '',
+      conclusao: report?.conclusao || '',
     });
-  }, [company, sectorId, responses, probability, report, psychologist]);
+  }, [company, sectorId, responses, probability, report]);
 
-  const getSeverityColor = (level: SeverityLevel | ProbabilityLevel | RiskMatrixLevel) => {
-    switch (level) {
-      case 'Baixa':
-      case 'Baixo':
-        return 'bg-green-600 text-white';
-      case 'Média':
-      case 'Médio':
-        return 'bg-yellow-500 text-gray-900';
-      case 'Alta':
-      case 'Alto':
-        return 'bg-red-600 text-white';
-      case 'Crítica':
-      case 'Crítico':
-        return 'bg-black text-white';
-      default:
-        return 'bg-gray-200 text-gray-800';
-    }
+  const handleReportChange = (field: keyof DiagnosticReport, value: string) => {
+    setLocalReport(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFieldChange = (
-    factorId: number,
-    field: 'fontesGeradoras' | 'agravos' | 'medidas',
-    value: string
-  ) => {
-    setLocalReport((prev) => ({
-      ...prev,
-      [field]: {
-        ...prev[field],
-        [factorId]: value
-      }
-    }));
-  };
-
-  const handleSaveClick = () => {
+  const handleSave = () => {
     onSave(localReport);
   };
 
-  // Função para exportar para PDF (placeholder)
-  const handleExportPdf = () => {
-    alert('Funcionalidade de exportar para PDF ainda não implementada.');
-    // Aqui você integraria uma biblioteca como jsPDF ou html2pdf
+  // --- Funções auxiliares para DOCX ---
+  const getRiskColor = (riskLevel: RiskMatrixLevel): string => {
+    switch (riskLevel) {
+      case 'Baixo': return '10B981';
+      case 'Médio': return 'F59E0B';
+      case 'Alto': return 'F97316';
+      case 'Crítico': return 'EF4444';
+      default: return '000000';
+    }
   };
 
-  return (
-    <div className="p-8 bg-white text-gray-800 font-sans">
-      <div className="mb-8 border-b pb-6 border-gray-300">
-        <h1 className="text-3xl font-bold text-blue-900 mb-4">Análise de Resultados - NR-01</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <p>
-            <strong className="text-blue-800">Empresa:</strong> {analysisData.company.nomeFantasia}
-          </p>
-          <p>
-            <strong className="text-blue-800">CNPJ:</strong> {analysisData.company.cnpj}
-          </p>
-          <p>
-            <strong className="text-blue-800">Setor:</strong> {analysisData.sectorName}
-          </p>
-          <p>
-            <strong className="text-blue-800">Data da Elaboração:</strong>{' '}
-            {localReport.dataElaboracao}
-          </p>
-          <p className="col-span-2">
-            <strong className="text-blue-800">Funções Avaliadas:</strong>{' '}
-            {localReport.funcoes?.join(', ') || 'N/A'}
-          </p>
-          <p className="col-span-2">
-            <strong className="text-blue-800">Responsável Técnico:</strong>{' '}
-            {localReport.author || 'Não informado'}
-            {psychologist?.registroCRP && ` (CRP: ${psychologist.registroCRP})`}
-          </p>
+  const getSeverityColor = (severityLevel: SeverityLevel): string => {
+    switch (severityLevel) {
+      case 'Baixa': return '10B981';
+      case 'Média': return 'F59E0B';
+      case 'Alta': return 'EF4444';
+      case 'Crítica': return 'EF4444';
+      default: return '000000';
+    }
+  };
+
+  const getProbabilityColor = (probabilityLevel: ProbabilityLevel): string => {
+    switch (probabilityLevel) {
+      case 'Improvável': return '10B981';
+      case 'Possível': return 'F59E0B';
+      case 'Provável': return 'EF4444';
+      default: return '000000';
+    }
+  };
+
+  const createParagraphsFromText = (text: string, bold: boolean = false, size: number = 24, color: string = '000000') => {
+    return text.split('\n').map((line) => new Paragraph({
+      children: [new TextRun({ text: line || ' ', bold, size, color })],
+      spacing: { after: 60, line: 240 }, // 🔵 lineSpacing 1.0
+    alignment: AlignmentType.JUSTIFIED, // 🔵 Justificado
+  }));
+};
+
+  // --- Mapeamento FIXO de Fontes Geradoras por Tema ---
+  const fontesGeradoras: { [key: string]: string } = {
+    'Assédio Moral e Sexual': 'Relações de Trabalho Abusivas, comunicação violenta, e importunação sexual.',
+    'Carga Excessiva de Trabalho': 'Metas irrealistas, Jornadas de Trabalho prolongadas, Horas extras excessivas, má distribuição de Cargos.',
+    'Falta de Reconhecimento e Recompensas': 'Gestão Pouco Humanizada, Administração de recursos precária.',
+    'Clima Organizacional': 'Autoritarismo, Gestão centralizadora, Ausência fiscalização de regras de bom convívio.',
+    'Falta Autonomia e Controle sobre o Trabalho': 'Gestão Não Humanizada, Escassez de Inteligência Emocional.',
+    'Pressão e Metas Irrealistas': 'Gestão não Humanizada, Propósitos financeiros desalinhados com saúde e Bem estar.',
+    'Insegurança e Ameaças': 'Gestão Não Humanizada, Escassez de Inteligência Emocional para gerenciar conflitos.',
+    'Conflitos Interpessoais e Falta de Comunicação': 'Falta de treinamentos, Gestão pouco habilitada, Baixas habilidades de oratória e comunicação não Violenta.',
+    'Alinhamento entre Vida Pessoal e Profissional': 'Ausência de Propósito pessoal, Falta de tempo, planejamento, incentivo e recursos.',
+  };
+
+  const getFonteGeradora = (tema: string): string => {
+    return fontesGeradoras[tema] || 'Não informada';
+  };
+
+    const generateDocx = async () => {
+    const psicologaNome = "Daniele Trebbi Fernandes Sofor";
+    const psicologaCRP = "06/74013";
+
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: convertInchesToTwip(0.7),
+              bottom: convertInchesToTwip(0.7),
+              left: convertInchesToTwip(0.7),
+              right: convertInchesToTwip(0.7),
+            },
+          },
+        },
+        children: [
+
+          // 🔵 TÍTULO FIXO
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `RELATÓRIO PSICOSSOCIAL – ANÁLISE DE SETOR`,
+                bold: true,
+                size: 24, // tamanho 12 no Word
+                color: '004481',
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          }),
+
+          // 🔵 DATA
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Data de Elaboração: ${generationDate}`, size: 22 }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 300 },
+          }),
+
+          // 🔵 1 — DADOS DA EMPRESA
+          new Paragraph({
+            children: [new TextRun({ text: `1. DADOS DA EMPRESA`, bold: true, size: 24 })],
+            spacing: { after: 80 },
+          }),
+          new Paragraph({ children: [new TextRun({ text: `Razão Social: ${company.razaoSocial}`, size: 22 })], spacing: { after: 60 } }),
+          new Paragraph({ children: [new TextRun({ text: `CNPJ: ${company.cnpj}`, size: 22 })], spacing: { after: 60 } }),
+          new Paragraph({ children: [new TextRun({ text: `Setor Avaliado: ${analysisData.sectorName}`, size: 22 })], spacing: { after: 200 } }),
+
+          // 🔵 2 — RESPONSÁVEL TÉCNICO
+          new Paragraph({
+            children: [new TextRun({ text: `2. Responsável Técnico: ${psicologaNome} / CRP ${psicologaCRP}`,bold: true, size: 24 })
+            ],
+            spacing: { after: 300 }
+            }),
+
+          // 🔵 3 — AGRAVOS
+          new Paragraph({
+            children: [new TextRun({ text: `3. AGRAVOS POTENCIAIS À SAÚDE MENTAL`, bold: true, size: 24 })],
+            spacing: { after: 120 },
+          }),
+          ...createParagraphsFromText(localReport.agravosSaude || 'Não informado.', false, 22),
+          new Paragraph({ spacing: { after: 300 } }),
+
+          // 🔵 4 — MEDIDAS DE CONTROLE
+          new Paragraph({
+            children: [new TextRun({ text: `4. MEDIDAS DE CONTROLE E INTERVENÇÃO`, bold: true, size: 24 })],
+            spacing: { after: 120 },
+          }),
+          ...createParagraphsFromText(localReport.medidasControle || 'Não informado.', false, 22),
+          new Paragraph({ spacing: { after: 300 } }),
+
+          // 🔵 5 — ANÁLISE DE RISCOS (NOVO NOME)
+          new Paragraph({
+            children: [new TextRun({ text: `5. ANÁLISE DE RISCOS PSICOSSOCIAIS POR SETOR`, bold: true, size: 24 })],
+            spacing: { after: 200 },
+          }),
+
+// 🔵 TABELA AJUSTADA (AZUL CLARO, SEM FUNDO PRETO, TEXTO CENTRALIZADO)
+new Table({
+  width: { size: 100, type: WidthType.PERCENTAGE },
+  rows: [
+
+new TableRow({
+  children: [
+    new TableCell({
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: 'TEMA', bold: true, size: 20, color: '#FFFFFF' })],
+          alignment: AlignmentType.CENTER
+        })
+      ],
+      shading: { fill: 'E5F1FB', type: ShadingType.SOLID },
+      verticalAlign: VerticalAlign.CENTER
+    }),
+
+    new TableCell({
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: 'FONTE GERADORA', bold: true, size: 20, color: '#FFFFFF' })],
+          alignment: AlignmentType.CENTER
+        })
+      ],
+      shading: { fill: 'E5F1FB', type: ShadingType.SOLID },
+      verticalAlign: VerticalAlign.CENTER
+    }),
+
+    new TableCell({
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: 'GRAVIDADE (SEVERIDADE)', bold: true, size: 20, color: '#FFFFFF' })],
+          alignment: AlignmentType.CENTER
+        })
+      ],
+      shading: { fill: 'E5F1FB', type: ShadingType.SOLID },
+      verticalAlign: VerticalAlign.CENTER
+    }),
+
+    new TableCell({
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: 'PROBABILIDADE DE OCORRÊNCIA', bold: true, size: 20, color: '#FFFFFF' })],
+          alignment: AlignmentType.CENTER
+        })
+      ],
+      shading: { fill: 'E5F1FB', type: ShadingType.SOLID },
+      verticalAlign: VerticalAlign.CENTER
+    }),
+
+    new TableCell({
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: 'MATRIZ DE RISCO', bold: true, size: 20, color: '#FFFFFF' })],
+          alignment: AlignmentType.CENTER
+        })
+      ],
+      shading: { fill: 'E5F1FB', type: ShadingType.SOLID },
+      verticalAlign: VerticalAlign.CENTER
+    }),
+  ],
+}),
+
+    // 🔵 LINHAS DA TABELA
+    ...analysisData.themes.map((theme) =>
+      new TableRow({
+        children: [
+
+          // Tema
+          new TableCell({
+  children: [
+    new Paragraph({
+      children: [new TextRun({ text: theme.label, size: 20 })],
+      alignment: AlignmentType.CENTER
+    })
+  ],
+  verticalAlign: VerticalAlign.CENTER,
+  margins: { top: 0, bottom: 0, left: 80, right: 80 } // 🔵 ZERO altura
+}),
+
+
+          // Fonte geradora
+          new TableCell({
+  children: [
+    new Paragraph({
+      children: [new TextRun({ text: getFonteGeradora(theme.label), size: 20 })],
+      alignment: AlignmentType.CENTER
+    })
+  ],
+  verticalAlign: VerticalAlign.CENTER,
+  margins: { top: 0, bottom: 0, left: 80, right: 80 } // 🔵 ZERO altura
+}),
+
+          // Gravidade – texto Baixa / Média / Alta / Crítica
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text:
+                      theme.avgGravity <= 1.5 ? 'Baixa' :
+                      theme.avgGravity <= 2.5 ? 'Média' :
+                      theme.avgGravity <= 3.5 ? 'Alta' :
+                      'Crítica',
+                    size: 20,
+                    color: getSeverityColor(
+                      theme.avgGravity <= 1.5 ? 'Baixa' :
+                      theme.avgGravity <= 2.5 ? 'Média' :
+                      theme.avgGravity <= 3.5 ? 'Alta' :
+                      'Crítica'
+                    )
+                  })
+                ],
+                alignment: AlignmentType.CENTER
+              })
+            ],
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 0, bottom: 0, left: 100, right: 100 },
+          }),
+
+          // Probabilidade – texto
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text:
+                      theme.probValue <= 1.5 ? 'Baixa' :
+                      theme.probValue <= 2.5 ? 'Média' :
+                      theme.probValue <= 3.5 ? 'Alta' :
+                      'Crítica',
+                    size: 20,
+                    color: getProbabilityColor(
+                      theme.probValue <= 1.5 ? 'Improvável' :
+                      theme.probValue <= 2.5 ? 'Possível' :
+                      'Provável'
+                    )
+                  })
+                ],
+                alignment: AlignmentType.CENTER
+              })
+            ],
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 0, bottom: 0, left: 100, right: 100 },
+          }),
+
+          // Matriz de risco
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: theme.risk,
+                    size: 20,
+                    color: getRiskColor(theme.risk)
+                  })
+                ],
+                alignment: AlignmentType.CENTER
+              })
+            ],
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 0, bottom: 0, left: 100, right: 100 },
+          }),
+
+        ]
+      })
+    )
+
+  ]
+}),
+
+
+          new Paragraph({ spacing: { after: 300 } }),
+
+          // 🔵 6 — CONCLUSÃO (dentro de uma caixa/tabela)
+new Table({
+  width: { size: 100, type: WidthType.PERCENTAGE },
+  rows: [
+    new TableRow({
+      children: [
+        new TableCell({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            right: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+          },
+          margins: {
+            top: 100,
+            bottom: 100,
+            left: 100,
+            right: 100,
+          },
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `CONCLUSÃO:`,
+                  bold: true,
+                  size: 24,
+                  color: '000000',
+                }),
+              ],
+              spacing: { after: 120 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: localReport.conclusao || '',
+                  size: 22,
+                  color: '000000',
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED, // 🔵 JUSTIFICADO
+              spacing: { line: 240, after: 60 }, // 🔵 espaçamento 1.0
+            }),
+          ],
+        }),
+      ],
+    }),
+  ],
+}),
+
+          // ❌ SEM assinatura no final
+        ],
+      }],
+    });
+
+    try {
+      const blob = await Packer.toBlob(doc);
+      const fileName = `Relatorio_Psicossocial_${company.nomeFantasia.replace(/\s+/g, '_')}_${analysisData.sectorName.replace(/\s+/g, '_')}.docx`;
+      saveAs(blob, fileName);
+    } catch (err) {
+      console.error('Erro DOCX:', err);
+      alert('Erro ao gerar arquivo.');
+    }
+  };
+
+    return (
+    <div className="p-8 bg-white text-gray-800">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-bold text-[#004481]">Análise de Resultados - {analysisData.sectorName}</h2>
+        <div className="flex space-x-4">
+          <button
+            onClick={handleSave}
+            className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-600 transition-colors flex items-center space-x-2 shadow-md"
+          >
+            <Save className="w-5 h-5" />
+            <span>Salvar Análise</span>
+          </button>
+          <button
+            onClick={generateDocx}
+            className="bg-blue-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-600 transition-colors flex items-center space-x-2 shadow-md"
+          >
+            <FileDown className="w-5 h-5" />
+            <span>Gerar DOCX</span>
+          </button>
         </div>
       </div>
 
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-blue-800 mb-4">
-          Classificação de Risco Psicossocial
-        </h2>
-        <table className="min-w-full bg-white border border-gray-300 shadow-md rounded-lg overflow-hidden">
-          <thead className="bg-blue-700 text-white">
-            <tr>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Fatores de Risco</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Fonte Geradora do Risco</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Gravidade (Severidade)</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Probabilidade de Ocorrência</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold uppercase">Matriz Risco</th>
-            </tr>
-          </thead>
-          <tbody>
-            {analysisData.factors.map((item) => (
-              <tr key={item.factor.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="py-3 px-4 text-sm font-medium text-gray-900">
-                  {item.factor.label}
-                </td>
-                <td className="py-3 px-4 text-sm">
-                  <textarea
-                    value={localReport.fontesGeradoras?.[item.factor.id] || ''}
-                    onChange={(e) =>
-                      handleFieldChange(item.factor.id, 'fontesGeradoras', e.target.value)
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800 resize-y min-h-[60px]"
-                    rows={3}
-                  />
-                </td>
-                <td className="py-3 px-4 text-sm">
-                  <span
-                    className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold text-xs ${getSeverityColor(
-                      item.gravidade
-                    )}`}
-                  >
-                    {item.gravidade}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-sm">
-                  <span
-                    className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold text-xs ${getSeverityColor(
-                      item.probabilidade
-                    )}`}
-                  >
-                    {item.probabilidade}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-sm">
-                  <span
-                    className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold text-xs ${getSeverityColor(
-                      item.matriz
-                    )}`}
-                  >
-                    {item.matriz}
-                  </span>
-                </td>
+      <p className="text-sm text-gray-600 mb-8">Data de Elaboração: {generationDate}</p>
+
+      <div className="mb-8 p-6 border border-gray-200 rounded-xl shadow-sm">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Gravidade Geral por Setor</h3>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="p-4 bg-green-100 text-green-800 rounded-lg">
+            <p className="text-sm font-semibold">Baixa</p>
+            <p className="text-2xl font-bold">{analysisData.gravityStats?.baixa ?? 0}</p>
+          </div>
+          <div className="p-4 bg-yellow-100 text-yellow-800 rounded-lg">
+            <p className="text-sm font-semibold">Média</p>
+            <p className="text-2xl font-bold">{analysisData.gravityStats?.media ?? 0}</p>
+          </div>
+          <div className="p-4 bg-red-100 text-red-800 rounded-lg">
+            <p className="text-sm font-semibold">Alta</p>
+            <p className="text-2xl font-bold">{analysisData.gravityStats?.alta ?? 0}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-8 p-6 border border-gray-200 rounded-xl shadow-sm">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Matriz de Risco por Setor</h3>
+        <div className="grid grid-cols-4 gap-4 text-center">
+          <div className="p-4 bg-green-100 text-green-800 rounded-lg">
+            <p className="text-sm font-semibold">Baixo</p>
+            <p className="text-2xl font-bold">{analysisData.riskMatrixStats?.baixo ?? 0}</p>
+          </div>
+          <div className="p-4 bg-yellow-100 text-yellow-800 rounded-lg">
+            <p className="text-sm font-semibold">Médio</p>
+            <p className="text-2xl font-bold">{analysisData.riskMatrixStats?.medio ?? 0}</p>
+          </div>
+          <div className="p-4 bg-orange-100 text-orange-800 rounded-lg">
+            <p className="text-sm font-semibold">Alto</p>
+            <p className="text-2xl font-bold">{analysisData.riskMatrixStats?.alto ?? 0}</p>
+          </div>
+          <div className="p-4 bg-red-100 text-red-800 rounded-lg">
+            <p className="text-sm font-semibold">Crítico</p>
+            <p className="text-2xl font-bold">{analysisData.riskMatrixStats?.critico ?? 0}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-8 p-6 border border-gray-200 rounded-xl shadow-sm">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Análise por Tema</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+            <thead>
+              <tr className="bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 border-b-2 border-gray-200">Tema</th>
+                <th className="px-4 py-3 border-b-2 border-gray-200 text-center">Fonte Geradora</th>
+                <th className="px-4 py-3 border-b-2 border-gray-200 text-center">Gravidade Média</th>
+                <th className="px-4 py-3 border-b-2 border-gray-200 text-center">Probabilidade</th>
+                <th className="px-4 py-3 border-b-2 border-gray-200 text-center">Risco</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Seções de Agravos e Medidas (editáveis) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        <div>
-          <h2 className="text-2xl font-semibold text-blue-800 mb-4">Possíveis Agravos à Saúde Mental</h2>
-          {analysisData.factors.map((item) => (
-            <div key={`agravos-${item.factor.id}`} className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {item.factor.label}:
-              </label>
-              <textarea
-                value={localReport.agravos?.[item.factor.id] || ''}
-                onChange={(e) => handleFieldChange(item.factor.id, 'agravos', e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800 resize-y min-h-[80px]"
-                rows={4}
-              />
-            </div>
-          ))}
-        </div>
-        <div>
-          <h2 className="text-2xl font-semibold text-blue-800 mb-4">Medidas de Controle Existentes</h2>
-          {analysisData.factors.map((item) => (
-            <div key={`medidas-${item.factor.id}`} className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {item.factor.label}:
-              </label>
-              <textarea
-                value={localReport.medidas?.[item.factor.id] || ''}
-                onChange={(e) => handleFieldChange(item.factor.id, 'medidas', e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800 resize-y min-h-[80px]"
-                rows={4}
-              />
-            </div>
-          ))}
+            </thead>
+            <tbody>
+              {(analysisData.themes || []).map((theme, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 border-b border-gray-200 text-sm">{theme.label}</td>
+                  <td className="px-4 py-3 border-b border-gray-200 text-sm">{getFonteGeradora(theme.label)}</td>
+                  <td className="px-4 py-3 border-b border-gray-200 text-sm text-center">
+                    <span className={`font-bold ${theme.avgGravity <= 2 ? 'text-green-600' : theme.avgGravity <= 4 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {theme.avgGravity.toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 border-b border-gray-200 text-sm text-center">
+                    <span className={`font-bold ${theme.probValue <= 1.5 ? 'text-green-600' : theme.probValue <= 2.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {theme.probValue.toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 border-b border-gray-200 text-sm text-center">
+                    <span className={`font-bold ${getRiskColor(theme.risk) === '10B981' ? 'text-green-600' : getRiskColor(theme.risk) === 'F59E0B' ? 'text-yellow-600' : getRiskColor(theme.risk) === 'F97316' ? 'text-orange-600' : 'text-red-600'}`}>
+                      {theme.risk}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div className="flex justify-end space-x-4 mt-8">
-        <button
-          onClick={handleExportPdf}
-          className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors"
-        >
-          <FileDown className="w-5 h-5" />
-          <span>Exportar para PDF</span>
-        </button>
-        <button
-          onClick={handleSaveClick}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors"
-        >
-          <Save className="w-5 h-5" />
-          <span>Salvar Análise</span>
-        </button>
+      <div className="space-y-8 p-6 border border-gray-200 rounded-xl shadow-sm">
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Agravos Potenciais à Saúde Mental</h3>
+          <textarea
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 h-32"
+            value={localReport.agravosSaude}
+            onChange={e => handleReportChange('agravosSaude', e.target.value)}
+            placeholder="Descreva os agravos potenciais à saúde mental..."
+          ></textarea>
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Medidas de Controle e Intervenção</h3>
+          <textarea
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 h-32"
+            value={localReport.medidasControle}
+            onChange={e => handleReportChange('medidasControle', e.target.value)}
+            placeholder="Descreva as medidas de controle e intervenção propostas..."
+          ></textarea>
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Conclusão</h3>
+          <textarea
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 h-32"
+            value={localReport.conclusao}
+            onChange={e => handleReportChange('conclusao', e.target.value)}
+            placeholder="Escreva a conclusão do relatório..."
+          ></textarea>
+        </div>
       </div>
     </div>
   );

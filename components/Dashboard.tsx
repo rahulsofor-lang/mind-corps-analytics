@@ -4,8 +4,8 @@ import {
   fetchResponsesByCompany,
   fetchResponsesBySector,
   fetchProbabilityBySector,
-  fetchReportBySector, // ✅ Importado
-  saveReportAnalysis // ✅ Importado
+  fetchReportBySector,
+  saveReportAnalysis
 } from '../services/firebaseService';
 import {
   Company,
@@ -13,7 +13,7 @@ import {
   GravityStats,
   RiskMatrixStats,
   ProbabilityAssessment,
-  DiagnosticReport // ✅ Importado
+  DiagnosticReport
 } from '../types';
 import {
   BarChart,
@@ -23,28 +23,24 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell // ✅ Importado
+  Cell
 } from 'recharts';
 import { Building2, Users, Target, FileText, LogOut } from 'lucide-react';
 import ReportAnalysis from './ReportAnalysis';
 
 interface DashboardProps {
   onLogout?: () => void;
-  onOpenReport?: (params: {
-    company: Company;
-    sectorId: string;
-    probability: ProbabilityAssessment | null;
-  }) => void;
+  // onOpenReport foi removido, pois o botão "Gerar Devolutiva" não existe mais.
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
+const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => { // onOpenReport removido dos props
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedSectorId, setSelectedSectorId] = useState<string>('');
   const [responsesAll, setResponsesAll] = useState<SurveyResponse[]>([]);
   const [responsesSector, setResponsesSector] = useState<SurveyResponse[]>([]);
   const [probabilitySector, setProbabilitySector] = useState<ProbabilityAssessment | null>(null);
-  const [reportSector, setReportSector] = useState<DiagnosticReport | null>(null); // ✅ Novo estado para o report
+  const [reportSector, setReportSector] = useState<DiagnosticReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingSector, setLoadingSector] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,10 +68,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
   };
 
   const handleSaveAnalysis = async (updatedReport: Partial<DiagnosticReport>) => {
-    if (!selectedCompany || !selectedSectorId) return; // ✅ Corrigido para selectedSectorId
+    if (!selectedCompany || !selectedSectorId) return;
 
     try {
-      await saveReportAnalysis(selectedCompany.id, selectedSectorId, updatedReport); // ✅ Corrigido para selectedCompany.id
+      await saveReportAnalysis(selectedCompany.id, selectedSectorId, updatedReport);
       alert('✅ Análise salva com sucesso!');
 
       // Recarregar o report atualizado
@@ -95,7 +91,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
       setSelectedSectorId('');
       setResponsesSector([]);
       setProbabilitySector(null);
-      setReportSector(null); // ✅ Limpa o report ao mudar de empresa
+      setReportSector(null);
 
       if (company) {
         setLoadingSector(true);
@@ -118,7 +114,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
       setSelectedSectorId(sectorId);
       setResponsesSector([]);
       setProbabilitySector(null);
-      setReportSector(null); // ✅ Limpa o report ao mudar de setor
+      setReportSector(null);
 
       if (selectedCompany && sectorId) {
         setLoadingSector(true);
@@ -128,8 +124,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
         const prob = await fetchProbabilityBySector(selectedCompany.id, sectorId);
         setProbabilitySector(prob);
 
-        const report = await fetchReportBySector(selectedCompany.id, sectorId); // ✅ Busca o report
-        setReportSector(report); // ✅ Define o report
+        const report = await fetchReportBySector(selectedCompany.id, sectorId);
+        setReportSector(report);
       }
     } catch (err) {
       setError('Erro ao carregar dados do setor.');
@@ -162,7 +158,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
       if (value === 1) base.baixo++;
       else if (value === 2) base.medio++;
       else if (value === 3) base.alto++;
-      else if (value >= 4) base.critico++; // ✅ Ajustado para >=4, mas o fetchProbabilityBySector já ajusta para 3
+      else if (value >= 4) base.critico++;
     });
 
     return base;
@@ -422,7 +418,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
 
         {/* Botões de ação */}
         {selectedCompany && selectedSectorId && responsesSector.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+          <div className="grid grid-cols-1 gap-4 mb-12"> {/* Ajustado para 1 coluna, já que só terá um botão */}
             {/* Botão Ver Análise de Resultados */}
             <button
               onClick={() => setShowAnalysis(true)}
@@ -432,22 +428,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
               <span>📊 Ver Análise de Resultados</span>
             </button>
 
-            {/* Botão Gerar Devolutiva */}
-            <button
-              onClick={() =>
-                onOpenReport &&
-                onOpenReport({
-                  company: selectedCompany,
-                  sectorId: selectedSectorId,
-                  probability: probabilitySector
-                })
-              }
-              className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-2xl font-bold hover:from-blue-700 hover:to-blue-900 transition-all shadow-2xl shadow-blue-900/40 flex items-center justify-center space-x-3 group active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!onOpenReport}
-            >
-              <FileText className="w-5 h-5 group-hover:rotate-6 transition-transform" />
-              <span>📄 Gerar Devolutiva</span>
-            </button>
+            {/* O botão "Gerar Devolutiva" foi removido daqui */}
           </div>
         )}
 
@@ -469,7 +450,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onOpenReport }) => {
                 sectorId={selectedSectorId}
                 responses={responsesSector}
                 probability={probabilitySector}
-                report={reportSector} // ✅ Passando o report
+                report={reportSector}
                 psychologist={null}
                 onSave={handleSaveAnalysis}
               />
