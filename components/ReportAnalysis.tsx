@@ -87,7 +87,7 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
       case 'Baixo': return '10B981';
       case 'Médio': return 'F59E0B';
       case 'Alto': return 'F97316';
-      case 'Crítico': return 'EF4444';
+      case 'Crítico': return '000000';
       default: return '000000';
     }
   };
