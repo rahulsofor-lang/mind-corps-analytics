@@ -119,24 +119,19 @@ export const fetchProbabilityBySector = async (
 
     const data = docSnap.data() as ProbabilityAssessment;
 
-    // CONVERTER SCORE 4 PARA 3
-    const adjustedScores: { [key: number]: number } = {};
-    Object.entries(data.scores).forEach(([key, value]) => {
-      const v = Number(value);
-      adjustedScores[Number(key)] = v >= 4 ? 3 : v;
-    });
+    // REMOVIDO: O BLOCO DE CÓDIGO QUE CONVERTIA SCORE 4 PARA 3 FOI APAGADO OU COMENTADO.
+    // Agora, os scores são retornados exatamente como estão no Firebase.
 
     return {
       ...data,
       id: docSnap.id,
-      scores: adjustedScores
+      scores: data.scores // AGORA ESTÁ USANDO OS SCORES ORIGINAIS DO FIREBASE
     };
   } catch (error) {
     console.error('❌ Erro ao buscar probabilidade:', error);
     return null;
   }
 };
-
 // ✅ 6. BUSCAR LAUDO (DEVOLUTIVA) DE UM SETOR
 export const fetchReportBySector = async (
   companyId: string,

@@ -1,58 +1,64 @@
 // services/riskCalculator.ts
 
-import { Evaluation, ProbabilityAssessment, RiskAnalysisResult } from '../types';
-import { RISK_FACTORS } from './riskFactors'; // Importar a lista de fatores de risco
+import { Evaluation, ProbabilityAssessment } from '../types';
+import { RISK_FACTORS } from './riskFactors';
+
+// A interface RiskAnalysisResult precisa ser definida no seu arquivo types.ts
+// ou aqui, se for exclusiva deste arquivo.
+// Vou assumir que ela está em '../types' e que inclui 'risco'.
+interface RiskAnalysisResult {
+  topico: string;
+  gravidade: number; // Média das respostas dos colaboradores (sempre exata)
+  probabilidade: number; // Score de probabilidade AUTOMÁTICO (arredondado)
+  risco: number; // Gravidade * Probabilidade
+}
 
 export const calculateRiskAnalysis = (
   evaluations: Evaluation[],
-  probAssessment: ProbabilityAssessment | null
+  // ✅ probabilityAssessment NÃO É MAIS USADO PARA DEFINIR A PROBABILIDADE,
+  // MAS PODE SER MANTIDO PARA COMPATIBILIDADE OU FUTURAS NECESSIDADES.
+  // Se você quiser removê-lo completamente, precisará ajustar a chamada em analysisCalculator.ts
+  probabilityAssessment: ProbabilityAssessment | null
 ): RiskAnalysisResult[] => {
-  if (!probAssessment || !probAssessment.scores) return [];
-
   const results: RiskAnalysisResult[] = [];
 
-  // Itera sobre os scores de probabilidade fornecidos pelo psicólogo
-  for (const factorIdStr in probAssessment.scores) {
-    const factorId = parseInt(factorIdStr);
-    const probabilityScore = probAssessment.scores[factorId]; // Probabilidade numérica definida pelo psicólogo
-
-    const riskFactor = RISK_FACTORS.find(f => f.id === factorId);
-    if (!riskFactor) continue; // Pula se não encontrar o fator correspondente
-
+  RISK_FACTORS.forEach((factor, factorIndex) => {
     // 1. Filtrar todas as respostas deste tópico (fator) em todas as avaliações do setor
     const topicResponses = evaluations.flatMap(e =>
-      e.respostas.filter(r => r.topico === riskFactor.label) // Filtra pelo label do fator
+      e.respostas.filter(r => r.topico === factor.label)
     );
 
-    // 2. Média de Gravidade (G) do Tópico
+    // 2. Calcular a MÉDIA de Gravidade (G) do Tópico
+    // ✅ A gravidade é mantida como a média exata, sem arredondamento.
     const avgGravity = topicResponses.length > 0
       ? topicResponses.reduce((acc, curr) => acc + curr.gravidadeNum, 0) / topicResponses.length
-      : 1; // Valor padrão 1 para evitar divisão por zero ou risco muito baixo
+      : 1; // Valor padrão 1 se não houver respostas para o tópico
 
-    // 3. Probabilidade (P) vem do psicólogo (já temos `probabilityScore`)
+    // 3. Determinar a PROBABILIDADE (P) AUTOMATICAMENTE com base na avgGravity
+    let automaticProbabilityScore: number;
 
-    // 4. Risco Final = G x P
-    const riskValue = parseFloat((avgGravity * probabilityScore).toFixed(1));
-
-    // 5. Classificação NR-01
-    let classification = { texto: 'Baixo', cor: '#10b981' };
-    if (riskValue > 6.0) {
-      classification = { texto: 'Crítico', cor: '#000000' };
-    } else if (riskValue > 4.0) {
-      classification = { texto: 'Alto', cor: '#ef4444' };
-    } else if (riskValue > 2.0) {
-      classification = { texto: 'Médio', cor: '#eab308' };
+    if (avgGravity >= 3.1) {
+      automaticProbabilityScore = 4; // Se a média da gravidade for 3.1 ou mais, probabilidade = 4
+    } else if (avgGravity >= 2.1) {
+      automaticProbabilityScore = 3; // Se a média da gravidade for 2.1 ou mais, probabilidade = 3
+    } else if (avgGravity >= 1.1) {
+      automaticProbabilityScore = 2; // Se a média da gravidade for 1.1 ou mais, probabilidade = 2
+    } else {
+      automaticProbabilityScore = 1; // Se a média da gravidade for menor que 1.1, probabilidade = 1
     }
 
+    // 4. Calcular o Risco Final = G x P
+    // ✅ Usa a avgGravity exata e a automaticProbabilityScore arredondada
+    const riskValue = parseFloat((avgGravity * automaticProbabilityScore).toFixed(2));
+
+    // ✅ RESULTADO para este fator
     results.push({
-      topico: riskFactor.label,
-      fonteGeradora: riskFactor.label, // Pode ser ajustado se a fonte geradora for diferente do label
-      gravidade: parseFloat(avgGravity.toFixed(2)),
-      probabilidade: probabilityScore, // A probabilidade numérica
-      risco: riskValue,
-      classificacao: classification
+      topico: factor.label,
+      gravidade: parseFloat(avgGravity.toFixed(2)), // Gravidade com 2 casas decimais
+      probabilidade: automaticProbabilityScore, // Probabilidade automática
+      risco: riskValue // O valor numérico do risco
     });
-  }
+  });
 
   return results;
 };
