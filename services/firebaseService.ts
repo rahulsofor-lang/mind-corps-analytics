@@ -17,22 +17,20 @@ import {
   SurveyResponse,
   ProbabilityAssessment,
   DiagnosticReport,
-  Psychologist // Mantido para tipagem, mas as funções de perfil foram removidas
+  Psychologist
 } from '../types';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ✅ COLEÇÕES DO FIREBASE
 export const collections = {
   COMPANIES: 'companies',
   RESPONSES: 'responses',
   PROBABILITY: 'probability',
   REPORTS: 'reports',
-  PROFILES: 'profiles' // Mantido caso outras partes do app usem, mas não para login
+  PROFILES: 'profiles'
 };
 
-// ✅ 1. BUSCAR TODAS AS EMPRESAS
 export const fetchCompanies = async (): Promise<Company[]> => {
   try {
     const snapshot = await getDocs(collection(db, collections.COMPANIES));
@@ -46,7 +44,6 @@ export const fetchCompanies = async (): Promise<Company[]> => {
   }
 };
 
-// ✅ 2. BUSCAR UMA EMPRESA POR ID
 export const fetchCompanyById = async (companyId: string): Promise<Company | null> => {
   try {
     const docRef = doc(db, collections.COMPANIES, companyId);
@@ -61,7 +58,6 @@ export const fetchCompanyById = async (companyId: string): Promise<Company | nul
   }
 };
 
-// ✅ 3. BUSCAR RESPOSTAS DE UMA EMPRESA
 export const fetchResponsesByCompany = async (
   companyId: string
 ): Promise<SurveyResponse[]> => {
@@ -81,7 +77,6 @@ export const fetchResponsesByCompany = async (
   }
 };
 
-// ✅ 4. BUSCAR RESPOSTAS DE UM SETOR
 export const fetchResponsesBySector = async (
   companyId: string,
   sectorId: string
@@ -103,7 +98,7 @@ export const fetchResponsesBySector = async (
   }
 };
 
-// ✅ 5. BUSCAR PROBABILIDADE DE UM SETOR (COM AJUSTE 4→3)
+// ✅ AGORA SEM AJUSTE 4→3
 export const fetchProbabilityBySector = async (
   companyId: string,
   sectorId: string
@@ -119,20 +114,17 @@ export const fetchProbabilityBySector = async (
 
     const data = docSnap.data() as ProbabilityAssessment;
 
-    // REMOVIDO: O BLOCO DE CÓDIGO QUE CONVERTIA SCORE 4 PARA 3 FOI APAGADO OU COMENTADO.
-    // Agora, os scores são retornados exatamente como estão no Firebase.
-
     return {
       ...data,
       id: docSnap.id,
-      scores: data.scores // AGORA ESTÁ USANDO OS SCORES ORIGINAIS DO FIREBASE
+      scores: data.scores
     };
   } catch (error) {
     console.error('❌ Erro ao buscar probabilidade:', error);
     return null;
   }
 };
-// ✅ 6. BUSCAR LAUDO (DEVOLUTIVA) DE UM SETOR
+
 export const fetchReportBySector = async (
   companyId: string,
   sectorId: string
@@ -156,7 +148,6 @@ export const fetchReportBySector = async (
   }
 };
 
-// ✅ 7. BUSCAR TODOS OS LAUDOS DE UMA EMPRESA
 export const fetchReportsByCompany = async (
   companyId: string
 ): Promise<DiagnosticReport[]> => {
@@ -176,19 +167,6 @@ export const fetchReportsByCompany = async (
   }
 };
 
-// ❌ REMOVIDO: 8. BUSCAR PSICÓLOGO (PARA LOGIN)
-// export const fetchPsychologist = async (): Promise<Psychologist | null> => { /* ... */ };
-
-// ❌ REMOVIDO: 9. CRIAR PSICÓLOGO PADRÃO (PRIMEIRO ACESSO)
-// export const createDefaultPsychologist = async (): Promise<void> => { /* ... */ };
-
-// ❌ REMOVIDO: 10. ATUALIZAR SENHA E PERGUNTA (PRIMEIRO ACESSO)
-// export const updatePsychologistPassword = async ( /* ... */ ): Promise<void> => { /* ... */ };
-
-// ❌ REMOVIDO: 11. RECUPERAR SENHA (ESQUECI A SENHA)
-// export const resetPassword = async ( /* ... */ ): Promise<boolean> => { /* ... */ };
-
-// ✅ 12. SALVAR/ATUALIZAR ANÁLISE DE RESULTADOS
 export const saveReportAnalysis = async (
   companyId: string,
   sectorId: string,
@@ -198,7 +176,6 @@ export const saveReportAnalysis = async (
     const reportId = `${companyId}_${sectorId}`;
     const reportRef = doc(db, collections.REPORTS, reportId);
 
-    // Adiciona ou atualiza o campo updatedAt com o Timestamp do Firebase
     await setDoc(reportRef, { ...updatedReport, updatedAt: Timestamp.now() }, { merge: true });
     console.log('✅ Análise de resultados salva/atualizada com sucesso!');
   } catch (error) {

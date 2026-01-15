@@ -87,26 +87,29 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
       case 'Baixo': return '10B981';
       case 'Médio': return 'F59E0B';
       case 'Alto': return 'F97316';
-      case 'Crítico': return '000000';
+      case 'Crítico': return '000000'; // ✅ PRETO
       default: return '000000';
     }
   };
 
-  const getSeverityColor = (severityLevel: SeverityLevel): string => {
-    switch (severityLevel) {
-      case 'Baixa': return '10B981';
-      case 'Média': return 'F59E0B';
-      case 'Alta': return 'EF4444';
-      case 'Crítica': return 'EF4444';
+  // ✅ getGravityColor para Gravidade (3 níveis)
+  const getGravityColor = (level: SeverityLevel): string => {
+    switch (level) {
+      case 'Baixa': return '10B981';   // Verde
+      case 'Média': return 'F59E0B';   // Amarelo
+      case 'Alta': return 'EF4444';    // Vermelho
+      // 'Crítica' não é um SeverityLevel, mas se fosse, seria preto
       default: return '000000';
     }
   };
 
-  const getProbabilityColor = (probabilityLevel: ProbabilityLevel): string => {
-    switch (probabilityLevel) {
-      case 'Improvável': return '10B981';
-      case 'Possível': return 'F59E0B';
-      case 'Provável': return 'EF4444';
+  // ✅ getProbabilityColor para Probabilidade (4 níveis)
+  const getProbabilityColor = (level: ProbabilityLevel): string => {
+    switch (level) {
+      case 'Baixo': return '10B981';   // Verde
+      case 'Médio': return 'F59E0B';   // Amarelo
+      case 'Alto': return 'EF4444';    // Vermelho
+      case 'Crítico': return '000000'; // Preto
       default: return '000000';
     }
   };
@@ -114,13 +117,15 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
   const createParagraphsFromText = (text: string, bold: boolean = false, size: number = 24, color: string = '000000') => {
     return text.split('\n').map((line) => new Paragraph({
       children: [new TextRun({ text: line || ' ', bold, size, color })],
-      spacing: { after: 60, line: 240 }, // 🔵 lineSpacing 1.0
-    alignment: AlignmentType.JUSTIFIED, // 🔵 Justificado
-  }));
-};
+      spacing: { after: 60, line: 240 },
+      alignment: AlignmentType.JUSTIFIED,
+    }));
+  };
 
   // --- Mapeamento FIXO de Fontes Geradoras por Tema ---
-  const fontesGeradoras: { [key: string]: string } = {
+  // A função getFonteGeradora abaixo ainda usará um mapa fixo para o DOCX,
+  // mas o dado real virá do riskCalculator.ts para o objeto analysisData.factors.
+  const fontesGeradorasMapForDocx: { [key: string]: string } = {
     'Assédio Moral e Sexual': 'Relações de Trabalho Abusivas, comunicação violenta, e importunação sexual.',
     'Carga Excessiva de Trabalho': 'Metas irrealistas, Jornadas de Trabalho prolongadas, Horas extras excessivas, má distribuição de Cargos.',
     'Falta de Reconhecimento e Recompensas': 'Gestão Pouco Humanizada, Administração de recursos precária.',
@@ -133,7 +138,9 @@ const ReportAnalysis: React.FC<ReportAnalysisProps> = ({
   };
 
   const getFonteGeradora = (tema: string): string => {
-    return fontesGeradoras[tema] || 'Não informada';
+    // Agora a fonte geradora deve vir do analysisData.factors.find(f => f.factor.label === tema)?.fonteGeradora
+    // Mas para o DOCX, vamos manter o mapa fixo para garantir que o texto seja o esperado.
+    return fontesGeradorasMapForDocx[tema] || 'Não informada';
   };
 
     const generateDocx = async () => {
@@ -296,7 +303,6 @@ new TableRow({
   margins: { top: 0, bottom: 0, left: 80, right: 80 } // 🔵 ZERO altura
 }),
 
-
           // Fonte geradora
           new TableCell({
   children: [
@@ -309,23 +315,17 @@ new TableRow({
   margins: { top: 0, bottom: 0, left: 80, right: 80 } // 🔵 ZERO altura
 }),
 
-          // Gravidade – texto Baixa / Média / Alta / Crítica
+          // Gravidade – texto Baixa / Média / Alta
           new TableCell({
             children: [
               new Paragraph({
                 children: [
                   new TextRun({
                     text:
-                      theme.avgGravity <= 1.5 ? 'Baixa' :
-                      theme.avgGravity <= 2.5 ? 'Média' :
-                      theme.avgGravity <= 3.5 ? 'Alta' :
-                      'Crítica',
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.gravidade || 'Baixa',
                     size: 20,
-                    color: getSeverityColor(
-                      theme.avgGravity <= 1.5 ? 'Baixa' :
-                      theme.avgGravity <= 2.5 ? 'Média' :
-                      theme.avgGravity <= 3.5 ? 'Alta' :
-                      'Crítica'
+                    color: getGravityColor(
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.gravidade || 'Baixa'
                     )
                   })
                 ],
@@ -336,22 +336,17 @@ new TableRow({
             margins: { top: 0, bottom: 0, left: 100, right: 100 },
           }),
 
-          // Probabilidade – texto
+          // Probabilidade – texto Baixo / Médio / Alto / Crítico
           new TableCell({
             children: [
               new Paragraph({
                 children: [
                   new TextRun({
                     text:
-                      theme.probValue <= 1.5 ? 'Baixa' :
-                      theme.probValue <= 2.5 ? 'Média' :
-                      theme.probValue <= 3.5 ? 'Alta' :
-                      'Crítica',
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.probabilidade || 'Baixo',
                     size: 20,
                     color: getProbabilityColor(
-                      theme.probValue <= 1.5 ? 'Improvável' :
-                      theme.probValue <= 2.5 ? 'Possível' :
-                      'Provável'
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.probabilidade || 'Baixo'
                     )
                   })
                 ],
@@ -386,7 +381,6 @@ new TableRow({
 
   ]
 }),
-
 
           new Paragraph({ spacing: { after: 300 } }),
 
@@ -538,17 +532,27 @@ new Table({
                   <td className="px-4 py-3 border-b border-gray-200 text-sm">{theme.label}</td>
                   <td className="px-4 py-3 border-b border-gray-200 text-sm">{getFonteGeradora(theme.label)}</td>
                   <td className="px-4 py-3 border-b border-gray-200 text-sm text-center">
-                    <span className={`font-bold ${theme.avgGravity <= 2 ? 'text-green-600' : theme.avgGravity <= 4 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    <span className={`font-bold ${
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.gravidade === 'Crítica' ? 'text-black' :
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.gravidade === 'Alta' ? 'text-red-600' :
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.gravidade === 'Média' ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
                       {theme.avgGravity.toFixed(2)}
                     </span>
                   </td>
                   <td className="px-4 py-3 border-b border-gray-200 text-sm text-center">
-                    <span className={`font-bold ${theme.probValue <= 1.5 ? 'text-green-600' : theme.probValue <= 2.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    <span className={`font-bold ${
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.probabilidade === 'Crítico' ? 'text-black' :
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.probabilidade === 'Alto' ? 'text-red-600' :
+                      analysisData.factors.find(f => f.factor.label === theme.label)?.probabilidade === 'Médio' ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
                       {theme.probValue.toFixed(2)}
                     </span>
                   </td>
                   <td className="px-4 py-3 border-b border-gray-200 text-sm text-center">
-                    <span className={`font-bold ${getRiskColor(theme.risk) === '10B981' ? 'text-green-600' : getRiskColor(theme.risk) === 'F59E0B' ? 'text-yellow-600' : getRiskColor(theme.risk) === 'F97316' ? 'text-orange-600' : 'text-red-600'}`}>
+                    <span className={`font-bold ${getRiskColor(theme.risk) === '10B981' ? 'text-green-600' : getRiskColor(theme.risk) === 'F59E0B' ? 'text-yellow-600' : getRiskColor(theme.risk) === 'F97316' ? 'text-orange-600' : 'text-black'}`}>
                       {theme.risk}
                     </span>
                   </td>
