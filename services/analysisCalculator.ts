@@ -94,7 +94,6 @@ const INVERTED_QUESTIONS_INDICES = new Set([
   65, // p - 66 (índice 65)
   66, // p - 67 (índice 66)
   67, // p - 68 (índice 67)
-  68, // p - 69 (índice 68)
   69, // p - 70 (índice 69)
   72, // p - 73 (índice 72)
   74, // p - 75 (índice 74)
