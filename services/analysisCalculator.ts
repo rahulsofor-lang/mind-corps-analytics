@@ -68,13 +68,51 @@ const getRiskMatrixLevel = (gravidade: number, probabilidade: number): RiskMatri
   return 'Baixo'; // Fallback para qualquer caso não coberto (idealmente não deve ocorrer)
 };
 
-// ✅ LISTA DE PERGUNTAS COM PONTUAÇÃO INVERTIDA
-// Estas são as perguntas onde 0 é o melhor cenário e 4 é o pior cenário,
-// mas a escala original do questionário as trata de forma inversa.
-// Portanto, precisamos inverter a pontuação (ex: 0 -> 4, 1 -> 3, 2 -> 2, 3 -> 1, 4 -> 0).
-const INVERTED_QUESTIONS = new Set([
-  1, 4, 5, 6, 9, 10, 11, 12, 18, 28, 46, 50, 52, 53, 57, 60, 61, 62, 64, 66, 67, 68, 69, 70, 73, 75, 76, 83, 89
+// ✅ LISTA DE PERGUNTAS INVERTIDAS
+// Baseado no arquivo 'Perguntas_invertidas.txt'
+// As perguntas são 1-indexed no documento, então ajustamos para 0-indexed para o array.
+const INVERTED_QUESTIONS_INDICES = new Set([
+  0, // p - 1 (índice 0)
+  3, // p - 4 (índice 3)
+  4, // p - 5 (índice 4)
+  5, // p - 6 (índice 5)
+  8, // p - 9 (índice 8)
+  9, // p - 10 (índice 9)
+  10, // p - 11 (índice 10)
+  11, // p - 12 (índice 11)
+  17, // p - 18 (índice 17)
+  27, // p - 28 (índice 27)
+  45, // p - 46 (índice 45)
+  49, // p - 50 (índice 49)
+  51, // p - 52 (índice 51)
+  52, // p - 53 (índice 52)
+  56, // p - 57 (índice 56)
+  59, // p - 60 (índice 59)
+  60, // p - 61 (índice 60)
+  61, // p - 62 (índice 61)
+  63, // p - 64 (índice 63)
+  65, // p - 66 (índice 65)
+  66, // p - 67 (índice 66)
+  67, // p - 68 (índice 67)
+  68, // p - 69 (índice 68)
+  69, // p - 70 (índice 69)
+  72, // p - 73 (índice 72)
+  74, // p - 75 (índice 74)
+  75, // p - 76 (índice 75)
+  82, // p - 83 (índice 82)
+  88  // p - 89 (índice 88)
 ]);
+
+// Função para inverter a pontuação de 0 a 4
+const invertScore = (score: number): number => {
+  // A escala é de 0 a 4.
+  // 0 -> 4
+  // 1 -> 3
+  // 2 -> 2
+  // 3 -> 1
+  // 4 -> 0
+  return 4 - score;
+};
 
 export const buildSectorAnalysisData = (
   company: Company,
@@ -97,15 +135,17 @@ export const buildSectorAnalysisData = (
     completedAt: response.completedAt,
     respostas: RISK_FACTORS.flatMap(factor => {
       const factorResponses: { topico: string; gravidadeNum: number }[] = [];
+      // Ajustamos o loop para usar o índice correto do array de respostas (0-indexed)
+      // As perguntas no `riskFactors.ts` são 1-indexed, então `i` é o número da pergunta.
+      // Para acessar o array `response.answers`, usamos `i - 1`.
       for (let i = factor.startQuestion; i <= factor.endQuestion; i++) {
-        let answer = response.answers[i]; // Pega a resposta original
+        const answerIndex = i - 1; // Converte o número da pergunta (1-indexed) para índice do array (0-indexed)
+        let answer = response.answers[answerIndex]; // Pega a resposta original
 
         if (answer !== undefined) {
-          // ✅ Lógica para inverter a pontuação se a pergunta estiver na lista de invertidas
-          if (INVERTED_QUESTIONS.has(i)) {
-            // A escala é de 0 a 4. Para inverter, usamos 4 - resposta original.
-            // Ex: 0 -> 4, 1 -> 3, 2 -> 2, 3 -> 1, 4 -> 0
-            answer = 4 - answer; 
+          // ✅ APLICA A LÓGICA DE INVERSÃO AQUI
+          if (INVERTED_QUESTIONS_INDICES.has(answerIndex)) {
+            answer = invertScore(answer); // Inverte a pontuação se for uma pergunta invertida
           }
 
           factorResponses.push({
@@ -119,6 +159,7 @@ export const buildSectorAnalysisData = (
   }));
 
   // calculateRiskAnalysis é responsável por calcular a gravidade e probabilidade (de 1 a 4)
+  // Ele receberá as gravidades já ajustadas para as perguntas invertidas.
   const riskAnalysisResults = calculateRiskAnalysis(evaluations, probability);
 
   const factorsAnalysis: FactorAnalysis[] = RISK_FACTORS.map(factor => {
