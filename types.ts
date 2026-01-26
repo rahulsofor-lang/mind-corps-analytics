@@ -86,9 +86,9 @@ export interface Psychologist {
 // =============================================================================
 
 export type SeverityLevel = 'Baixa' | 'Média' | 'Alta';
-// ✅ AGORA COM 4 NÍVEIS
-export type ProbabilityLevel = 'Baixo' | 'Médio' | 'Alto' | 'Crítico';
-export type RiskMatrixLevel = 'Baixo' | 'Médio' | 'Alto' | 'Crítico';
+// ✅ CORRIGIDO: Agora com 3 NÍVEIS, alinhado com a explicação e analysisCalculator.ts
+export type ProbabilityLevel = 'Baixa' | 'Média' | 'Alta';
+export type RiskMatrixLevel = 'Baixo' | 'Médio' | 'Alto' | 'Crítico'; // Este continua com 4 níveis, conforme a NR 01
 
 export interface RiskFactor {
   id: number;
